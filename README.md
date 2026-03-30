@@ -1,64 +1,110 @@
-# AntCar-CARLA
+# AntCar — Bio-Inspired Visual Navigation in CARLA
 
-Navigation visuelle bio-inspirée (modèle fourmi) appliquée à un véhicule autonome dans CARLA Simulator.
+![Python](https://img.shields.io/badge/Python-3.8+-blue)
+![CARLA](https://img.shields.io/badge/CARLA-0.9.15-orange)
+![Status](https://img.shields.io/badge/Status-Completed-green)
 
-## Description
+> Navigation visuelle bio-inspirée basée sur le modèle neuronal **Mushroom Body** de la fourmi *Cataglyphis*, adapté à un véhicule autonome simulé dans CARLA.
 
-Ce projet reprend le modèle de navigation des fourmis (*Cataglyphis*) basé sur les Mushroom Bodies (corps pédonculés) et l'adapte pour un véhicule simulé dans CARLA. Le principe est simple : le véhicule apprend une route en capturant des vues panoramiques basse résolution, puis il navigue en comparant la scène courante avec ce qu'il a mémorisé.
+Projet de recherche — M2 Intelligence Artificielle & Robotique, [ETIS Laboratory](https://www.etis-lab.fr/) (CNRS UMR 8051 / CY Cergy Paris Université / ENSEA)  
+Encadrant : **Nicolas Cuperlier**
 
-Deux Mushroom Bodies sont entraînés avec des oscillations dans des directions opposées, ce qui permet de calculer un signal de direction : si MB1 est plus "surpris" que MB2, le véhicule tourne d'un côté, et inversement.
+---
 
-Le code est basé sur les travaux de Gattaux et al. (2023, 2025) et utilise leur implémentation du Mushroom Body.
+## Principe
 
-## Fichiers
+Le véhicule apprend une route en capturant des vues panoramiques fisheye basse résolution (32×32 px), sans carte ni GPS. Deux Mushroom Bodies (MBs) latéralisés sont entraînés avec des oscillations en directions opposées. Pendant la navigation, le signal de direction est calculé à partir du déséquilibre d'*unfamiliarity* entre les deux MBs : si MB1 est plus "surpris" que MB2, le véhicule tourne d'un côté, et inversement.
 
-- `src/memory.py` - Modèle neuronal Mushroom Body 
-- `src/antcar_sim.py` - Traitement visuel et simulation offline 
-- `src/ant_pip.py` - Pipeline complet CARLA : capture, entrainement, navigation
-- `src/ant_pip_log.py` - Même chose que ant_pip.py mais avec logging XTE/HE pendant la navigation
-- `src/meteo.py` - Expériences météo : teste la navigation sous pluie, nuit, brouillard, crépuscule
-- `src/run_parallel_learning.py` - Expérience multi-trajets : apprentissage incrémental depuis plusieurs offsets latéraux
+Le modèle est directement inspiré des travaux de **Gattaux et al. (2023, 2025)** sur mini-robot, ici transféré à l'échelle d'un véhicule urbain simulé.
 
+---
+
+## Résultats
+
+Expériences sur une route de **300 waypoints dans Town05** (CARLA 0.9.15) :
+
+| Condition | Taux de succès | XTE médian | XTE max absolu |
+|-----------|---------------|------------|----------------|
+| Baseline (0 m offset) | 10/10 | **0.53 ± 0.06 m** | 3.78 m |
+| Offset latéral (±0.5 m) | 8/10 | 0.71 ± 0.12 m | — |
+
+Figures disponibles dans `results/`.
+
+---
+
+## Structure du projet
+
+```
+AntCar-/
+├── src/
+│   ├── memory.py               # Modèle neuronal Mushroom Body
+│   ├── antcar_sim.py           # Traitement visuel et simulation offline
+│   ├── ant_pip.py              # Pipeline complet CARLA : capture, entraînement, navigation
+│   ├── ant_pip_log.py          # Pipeline avec logging XTE/HE
+│   ├── meteo.py                # Expériences météo (pluie, nuit, brouillard, crépuscule)
+│   └── run_parallel_learning.py # Apprentissage multi-trajets depuis plusieurs offsets
+├── paper/                      # Paper final (IEEE format)
+├── results/                    # Figures de résultats
+├── requirements.txt
+└── README.md
+```
+
+---
 
 ## Prérequis
 
 - Python >= 3.8
-- CARLA Simulator >= 0.9.13
+- CARLA Simulator >= 0.9.15 (testé sur Town05)
 - Voir `requirements.txt` pour les dépendances Python
+
+---
 
 ## Installation
 
 ```bash
-git clone <url>
-cd antcar_carla_git
+git clone https://github.com/Samferg99/AntCar-.git
+cd AntCar-
 pip install -r requirements.txt
 ```
 
-Il faut aussi lancer le serveur CARLA avant d'exécuter le pipeline (on utilise **Town05**) :
+Lancer le serveur CARLA avant d'exécuter le pipeline :
 ```bash
-./CarlaUE4.sh   # Linux
+./CarlaUE4.sh        # Linux
+CarlaUE4.exe         # Windows
 ```
+
+---
 
 ## Utilisation
 
 ```bash
 cd src/
 
-# Entrainement offline (phases 1 a 4)
+# Entraînement offline (phases 1 à 4)
 python ant_pip.py --mode offline
 
-# Navigation dynamique (phase 5, necessite un modele deja entrainé)
+# Navigation dynamique (phase 5, nécessite un modèle déjà entraîné)
 python ant_pip.py --mode navigate --model_dir ./antcar_out
 
-# Tout d'un coup
+# Pipeline complet
 python ant_pip.py --mode all
 ```
 
+---
+
 ## Pipeline
 
-1. **Capture apprentissage** : le véhicule est téléporté le long de la route, on capture des images fisheye à chaque position
-2. **Augmentation + entrainement** : on augmente les images par rotation (oscillations) et on entraîne les deux MBs
-3. **Capture test** : même chose mais avec un décalage latéral
-4. **Evaluation offline** : on mesure l'unfamiliarity, le Cross-Track Error et le Heading Error
-5. **Navigation dynamique** : le véhicule roule en boucle fermée, guidé par le signal des MBs
+1. **Capture apprentissage** — le véhicule est téléporté le long de la route, images fisheye capturées à chaque waypoint
+2. **Augmentation + entraînement** — rotation des images (oscillations ±θ) et entraînement anti-Hebbien des deux MBs
+3. **Capture test** — même procédure avec un décalage latéral configurable
+4. **Évaluation offline** — calcul de l'unfamiliarity, du Cross-Track Error (XTE) et du Heading Error (HE)
+5. **Navigation dynamique** — boucle fermée temps réel, signal de steering issu du déséquilibre MB1/MB2
 
+---
+
+## Références
+
+- Gattaux et al. (2025). *Lateralized mushroom body model for visual route navigation*. Nature Communications.
+- Gattaux et al. (2023). *AntCar: bio-inspired navigation on a mini-robot*. IEEE/AICAS-HAL.
+- Ardin et al. (2016). *Using an insect mushroom body circuit to encode route memory*. PLOS Computational Biology.
+- Dosovitskiy et al. (2017). *CARLA: An open urban driving simulator*. CoRL.
