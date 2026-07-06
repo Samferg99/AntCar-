@@ -3,6 +3,7 @@
 ![Python](https://img.shields.io/badge/Python-3.8+-blue)
 ![CARLA](https://img.shields.io/badge/CARLA-0.9.15-orange)
 ![Status](https://img.shields.io/badge/Status-Completed-green)
+![License](https://img.shields.io/badge/License-MIT-green)
 
 > Navigation visuelle bio-inspirée basée sur le modèle neuronal **Mushroom Body** de la fourmi *Cataglyphis*, adapté à un véhicule autonome simulé dans CARLA.
 
